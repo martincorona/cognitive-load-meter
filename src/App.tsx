@@ -1,121 +1,49 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from "react";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+    const [score, setScore] = useState<number>(0);
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    useEffect(() => {
+        if (typeof chrome === "undefined" || !chrome.storage?.local) {
+            return;
+        }
 
-      <div className="ticks"></div>
+        chrome.storage.local.get(["currentLoadScore"], (result) => {
+            const storedScore = Number(result.currentLoadScore ?? 0);
+            setScore(storedScore);
+        });
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        const handleChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+            if (areaName === "local" && changes.currentLoadScore) {
+                const newScore = Number(changes.currentLoadScore.newValue ?? 0);
+                setScore(newScore);
+            }
+        };
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        chrome.storage.onChanged.addListener(handleChange);
+
+        return () => {
+            chrome.storage.onChanged.removeListener(handleChange);
+        };
+    }, []);
+
+    const status = score < 30 ? "Low" : score < 70 ? "Moderate" : "High";
+    const statusClass = score < 30 ? "low" : score < 70 ? "moderate" : "high";
+
+    return (
+        <div className="container">
+            <header className="container-header">
+                <h1>Cognitive Load Meter</h1>
+                <p className="subtitle">Live browser focus status</p>
+            </header>
+
+            <div className="score-section">
+                <div className={`score ${statusClass}`}>{score}</div>
+                <div className="status">{status} Load</div>
+            </div>
+        </div>
+    );
 }
 
-export default App
+export default App;

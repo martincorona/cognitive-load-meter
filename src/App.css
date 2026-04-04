@@ -1,103 +1,179 @@
-/* src/App.css */
 :root {
-  background-color: #050505;
-  color: #ffffff;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(102, 226, 194, 0.12), transparent 38%),
+    linear-gradient(180deg, #07111f 0%, #030711 100%);
+  color: #f6f7fb;
+  font-family: "IBM Plex Sans", "Avenir Next", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
-  padding: 0;
+  min-width: 360px;
 }
 
-.extension-container {
-  width: 300px;
-  padding: 24px;
-  text-align: center;
+#root {
+  width: 100%;
+}
+
+.extension-shell {
   box-sizing: border-box;
+  width: 360px;
+  padding: 22px;
 }
 
-header {
+.topbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
-.system-id {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.4);
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: rgba(246, 247, 251, 0.55);
 }
 
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  transition: background-color 0.5s ease, box-shadow 0.5s ease;
-}
-
-.score-wrapper {
-  margin: 10px 0;
-}
-
-.score-number {
-  font-size: 5rem;
-  font-weight: 800;
+h1 {
+  margin: 0;
+  font-size: 1.75rem;
   line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.status-chip {
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hero {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.score-label {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(246, 247, 251, 0.55);
+}
+
+.score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.score-value {
+  font-size: 4.25rem;
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.08em;
 }
 
 .score-unit {
-  font-size: 1.5rem;
-  opacity: 0.3;
+  font-size: 1rem;
+  color: rgba(246, 247, 251, 0.42);
 }
 
-.status-msg {
-  font-size: 0.85rem;
-  opacity: 0.6;
-  height: 40px;
-  margin-top: 10px;
+.summary {
+  margin: 12px 0 0;
+  font-size: 0.96rem;
+  line-height: 1.5;
+  color: rgba(246, 247, 251, 0.82);
 }
 
-.visualizer-area {
-  height: 100px;
+.panel {
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.panel-title {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(246, 247, 251, 0.55);
+}
+
+.reason-list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(246, 247, 251, 0.86);
+}
+
+.reason-list li + li {
+  margin-top: 8px;
+}
+
+.metric-list {
+  display: grid;
+  gap: 12px;
+}
+
+.metric-header {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: rgba(246, 247, 251, 0.84);
 }
 
-.pulse-orb {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  transition: all 0.5s ease;
-  animation: pulse 2s infinite ease-in-out;
+.metric-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
 }
 
-@keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.5; }
-  50% { transform: scale(1.05); opacity: 0.8; }
-  100% { transform: scale(0.95); opacity: 0.5; }
+.metric-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 220ms ease;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.16);
 }
 
-footer {
-  margin-top: 20px;
+.footer {
+  display: grid;
+  gap: 12px;
+}
+
+.footnote {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(246, 247, 251, 0.58);
 }
 
 .reset-btn {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  padding: 8px 16px;
-  font-size: 10px;
-  border-radius: 4px;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 700;
+  color: #031018;
+  background: #f6f7fb;
   cursor: pointer;
-  letter-spacing: 1px;
-  transition: all 0.3s;
 }
 
 .reset-btn:hover {
-  background: white;
-  color: black;
+  background: #ffffff;
 }

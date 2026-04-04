@@ -1,18 +1,51 @@
-// src/App.tsx
 import { useEffect, useState } from "react";
 import "./App.css";
+import type { ScoreState } from "./types";
+
+const defaultState: ScoreState = {
+  score: 0,
+  level: "focused",
+  summary: "Steady interaction pattern.",
+  reasons: ["No elevated friction signals detected."],
+  breakdown: {
+    contextSwitching: 0,
+    correctionFriction: 0,
+    interactionTurbulence: 0,
+    attentionFragmentation: 0,
+  },
+  latestWindow: {
+    windowMs: 30_000,
+    keyPresses: 0,
+    correctionKeys: 0,
+    pasteEvents: 0,
+    pointerClicks: 0,
+    scrollEvents: 0,
+    scrollDirectionChanges: 0,
+    idleTransitions: 0,
+    visibilityChanges: 0,
+  },
+  updatedAt: Date.now(),
+};
+
+const levelTheme = {
+  focused: { accent: "#66e2c2", label: "Focused" },
+  strained: { accent: "#f0bf4c", label: "Strained" },
+  fragmented: { accent: "#ff6b6b", label: "Fragmented" },
+} as const;
 
 function App() {
-  const [load, setLoad] = useState<number>(0);
+  const [state, setState] = useState<ScoreState>(defaultState);
 
   useEffect(() => {
-    chrome.storage.local.get(["cognitiveLoad"], (res) => {
-      setLoad(typeof res.cognitiveLoad === "number" ? res.cognitiveLoad : 0);
+    chrome.storage.local.get(["scoreState"], (res) => {
+      if (res.scoreState) {
+        setState(res.scoreState as ScoreState);
+      }
     });
 
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes.cognitiveLoad && typeof changes.cognitiveLoad.newValue === "number") {
-        setLoad(changes.cognitiveLoad.newValue);
+      if (changes.scoreState?.newValue) {
+        setState(changes.scoreState.newValue as ScoreState);
       }
     };
 
@@ -20,18 +53,75 @@ function App() {
     return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
 
-  const theme = load > 80 ? { c: "#ff4d4d", t: "CRITICAL" } : load > 50 ? { c: "#ffcc00", t: "ELEVATED" } : { c: "#00ffcc", t: "OPTIMAL" };
+  const theme = levelTheme[state.level];
+  const breakdownEntries = [
+    { label: "Context switching", value: state.breakdown.contextSwitching },
+    { label: "Correction friction", value: state.breakdown.correctionFriction },
+    { label: "Interaction turbulence", value: state.breakdown.interactionTurbulence },
+    { label: "Attention fragmentation", value: state.breakdown.attentionFragmentation },
+  ];
 
   return (
-    <div style={{ width: "300px", padding: "20px", background: "#050505", color: "white", textAlign: "center" }}>
-      <h2 style={{ color: theme.c, fontSize: "1rem" }}>{theme.t} LOAD</h2>
-      <div style={{ fontSize: "5rem", fontWeight: "bold" }}>{load}%</div>
-      <div style={{ height: "100px", display: "flex", justifyContent: "center", alignItems: "center" }}>
-        <div style={{ width: "50px", height: "50px", borderRadius: "50%", border: `2px solid ${theme.c}`, boxShadow: `0 0 20px ${theme.c}aa` }}></div>
-      </div>
-      <button onClick={() => chrome.runtime.sendMessage({ type: "RESET_LOAD" })} style={{ marginTop: "20px", background: "none", border: "1px solid #333", color: "white", cursor: "pointer", padding: "5px 10px" }}>
-        RESET SYSTEM
-      </button>
+    <div className="extension-shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Cognitive Load Meter</p>
+          <h1>Load Proxy</h1>
+        </div>
+        <div className="status-chip" style={{ borderColor: `${theme.accent}66`, color: theme.accent }}>
+          {theme.label}
+        </div>
+      </header>
+
+      <section className="hero">
+        <p className="score-label">Current score</p>
+        <div className="score-row">
+          <span className="score-value" style={{ color: theme.accent }}>
+            {state.score}
+          </span>
+          <span className="score-unit">/100</span>
+        </div>
+        <p className="summary">{state.summary}</p>
+      </section>
+
+      <section className="panel">
+        <p className="panel-title">Top reasons</p>
+        <ul className="reason-list">
+          {state.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="panel">
+        <p className="panel-title">Signal breakdown</p>
+        <div className="metric-list">
+          {breakdownEntries.map((entry) => (
+            <div className="metric-row" key={entry.label}>
+              <div className="metric-header">
+                <span>{entry.label}</span>
+                <span>{entry.value}</span>
+              </div>
+              <div className="metric-bar">
+                <div
+                  className="metric-fill"
+                  style={{ width: `${entry.value}%`, background: theme.accent }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="footer">
+        <p className="footnote">Rolling 30 second window. This is a behavioral proxy, not a medical measurement.</p>
+        <button
+          className="reset-btn"
+          onClick={() => chrome.runtime.sendMessage({ type: "RESET_LOAD" })}
+        >
+          Reset score
+        </button>
+      </footer>
     </div>
   );
 }

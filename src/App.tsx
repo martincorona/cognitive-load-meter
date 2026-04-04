@@ -1,36 +1,126 @@
-// src/App.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import { DECAY_PER_SECOND, STORAGE_KEYS, clampLoad } from "./shared";
+const INITIAL_NOW = Date.now();
+
+type LoadSnapshot = {
+  currentLoadScore?: number;
+  lastUpdatedAt?: number;
+  customAiMessage?: string;
+};
 
 function App() {
-  const [load, setLoad] = useState<number>(0);
+  const [baseScore, setBaseScore] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
+  const [aiMessage, setAiMessage] = useState("");
+  const [now, setNow] = useState(INITIAL_NOW);
 
   useEffect(() => {
-    chrome.storage.local.get(["cognitiveLoad"], (res) => {
-      setLoad(typeof res.cognitiveLoad === "number" ? res.cognitiveLoad : 0);
-    });
+    const applySnapshot = (snapshot: LoadSnapshot) => {
+      if (typeof snapshot.currentLoadScore === "number") {
+        setBaseScore(clampLoad(snapshot.currentLoadScore));
+      }
 
-    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes.cognitiveLoad && typeof changes.cognitiveLoad.newValue === "number") {
-        setLoad(changes.cognitiveLoad.newValue);
+      if (typeof snapshot.lastUpdatedAt === "number") {
+        setLastUpdatedAt(snapshot.lastUpdatedAt);
+      }
+
+      if (typeof snapshot.customAiMessage === "string") {
+        setAiMessage(snapshot.customAiMessage);
       }
     };
 
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
+    void chrome.storage.local
+      .get([STORAGE_KEYS.score, STORAGE_KEYS.updatedAt, STORAGE_KEYS.message])
+      .then((result) => {
+        applySnapshot(result);
+      });
+
+    const storageListener: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (
+      changes,
+      area,
+    ) => {
+      if (area !== "local") return;
+
+      const update: LoadSnapshot = {};
+      if (changes[STORAGE_KEYS.score]) {
+        update.currentLoadScore = changes[STORAGE_KEYS.score].newValue as number;
+      }
+
+      if (changes[STORAGE_KEYS.updatedAt]) {
+        update.lastUpdatedAt = changes[STORAGE_KEYS.updatedAt].newValue as number;
+      }
+
+      if (changes[STORAGE_KEYS.message]) {
+        update.customAiMessage = changes[STORAGE_KEYS.message].newValue as string;
+      }
+
+      applySnapshot(update);
+    };
+
+    chrome.storage.onChanged.addListener(storageListener);
+
+    const ticker = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(storageListener);
+      window.clearInterval(ticker);
+    };
   }, []);
 
-  const theme = load > 80 ? { c: "#ff4d4d", t: "CRITICAL" } : load > 50 ? { c: "#ffcc00", t: "ELEVATED" } : { c: "#00ffcc", t: "OPTIMAL" };
+  const load = useMemo(() => {
+    if (!lastUpdatedAt || !now) {
+      return Math.round(clampLoad(baseScore));
+    }
+
+    const elapsedSeconds = Math.max(0, (now - lastUpdatedAt) / 1000);
+    return Math.round(clampLoad(baseScore - elapsedSeconds * DECAY_PER_SECOND));
+  }, [baseScore, lastUpdatedAt, now]);
+
+  const status =
+    load >= 85
+      ? { label: "Critical", mood: "Intervention advised", className: "is-critical" }
+      : load >= 60
+        ? { label: "Elevated", mood: "Take a short pause soon", className: "is-elevated" }
+        : load >= 35
+          ? { label: "Focused", mood: "Steady flow, keep pacing", className: "is-focused" }
+          : { label: "Optimal", mood: "Calm and clear", className: "is-optimal" };
 
   return (
-    <div style={{ width: "300px", padding: "20px", background: "#050505", color: "white", textAlign: "center" }}>
-      <h2 style={{ color: theme.c, fontSize: "1rem" }}>{theme.t} LOAD</h2>
-      <div style={{ fontSize: "5rem", fontWeight: "bold" }}>{load}%</div>
-      <div style={{ height: "100px", display: "flex", justifyContent: "center", alignItems: "center" }}>
-        <div style={{ width: "50px", height: "50px", borderRadius: "50%", border: `2px solid ${theme.c}`, boxShadow: `0 0 20px ${theme.c}aa` }}></div>
-      </div>
-      <button onClick={() => chrome.runtime.sendMessage({ type: "RESET_LOAD" })} style={{ marginTop: "20px", background: "none", border: "1px solid #333", color: "white", cursor: "pointer", padding: "5px 10px" }}>
-        RESET SYSTEM
+    <div className={`extension-container ${status.className}`}>
+      <header className="header">
+        <div>
+          <p className="eyebrow">Cognitive Load Meter</p>
+          <h1>Live State</h1>
+        </div>
+        <span className="status-pill">{status.label}</span>
+      </header>
+
+      <section className="score-card">
+        <div className="score-row">
+          <p className="score-number">{load}</p>
+          <p className="score-unit">/100</p>
+        </div>
+        <p className="status-copy">{status.mood}</p>
+        <div className="meter-track">
+          <div className="meter-fill" style={{ width: `${load}%` }} />
+        </div>
+      </section>
+
+      <section className="coach-note">
+        <p className="coach-label">Coach Note</p>
+        <p>{aiMessage.trim() || "When load spikes, do one slow breath before switching context."}</p>
+      </section>
+
+      <button
+        className="reset-btn"
+        onClick={() => {
+          chrome.runtime.sendMessage({ type: "RESET_LOAD" });
+        }}
+      >
+        Reset System
       </button>
     </div>
   );

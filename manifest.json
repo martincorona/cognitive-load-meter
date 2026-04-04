@@ -3,7 +3,7 @@
   "name": "Cognitive Load Meter",
   "version": "1.0.0",
   "action": { "default_popup": "index.html" },
-  "permissions": ["storage", "tabs", "activeTab", "scripting"],
+  "permissions": ["storage", "tabs", "tabGroups", "activeTab", "scripting"],
   "icons": {
     "128": "icon.png"
   },

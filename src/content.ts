@@ -88,7 +88,6 @@ const createOverlay = () => {
   closeButton.onclick = () => {
     overlay.style.opacity = "0";
     setTimeout(() => {
-      overlay.style.pointerEvents = "none";
       chrome.storage.local.set({ currentLoadScore: 0 }); 
       isOverlayActive = false;
     }, 800); // Wait for the fade out

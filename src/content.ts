@@ -1,6 +1,32 @@
 // src/content.ts
 
-// 1. Create the overlay element (but don't show it yet)
+// ==========================================
+// 1. SILENT TRACKER LOGIC (Person 1's Job)
+// ==========================================
+let activityCount = 0;
+
+// Listen for mouse movement
+window.addEventListener("mousemove", () => { 
+  activityCount += 0.5; 
+});
+
+// Listen for keystrokes
+window.addEventListener("keydown", () => { 
+  activityCount += 2; 
+});
+
+// Every 2 seconds, send the batch of activity to the background script
+setInterval(() => {
+  if (activityCount > 0) {
+    chrome.runtime.sendMessage({ type: "ACTIVITY_BATCH", value: activityCount });
+    activityCount = 0; 
+  }
+}, 2000);
+
+
+// ==========================================
+// 2. OVERLAY UI LOGIC (Person 3's Job)
+// ==========================================
 const createOverlay = () => {
   const overlay = document.createElement("div");
   overlay.id = "cognitive-load-overlay";
@@ -60,7 +86,9 @@ const createOverlay = () => {
     setTimeout(() => {
       overlay.style.pointerEvents = "none";
       // Tell Chrome we took a break, reset the score so it doesn't immediately pop up again
-      chrome.storage.local.set({ currentLoadScore: 0 }); 
+      chrome.storage.local.set({ cognitiveLoad: 0 }); 
+      // Tell the background script to reset its internal counter too
+      chrome.runtime.sendMessage({ type: "RESET_LOAD" });
     }, 500);
   };
 
@@ -75,16 +103,21 @@ const createOverlay = () => {
 // Initialize the overlay on the page
 const overlayElement = createOverlay();
 
-// 2. The Listener: Watch for the stress score to spike
+
+// ==========================================
+// 3. THE LISTENER: Watch for the stress score to spike
+// ==========================================
 let isOverlayActive = false;
 
 // Check the score every 2 seconds
 setInterval(() => {
-  chrome.storage.local.get(["currentLoadScore"], (result) => {
-    const score = result.currentLoadScore || 0;
-    console.log("Current Load Score:", score); // For your debugging
+  // We use "cognitiveLoad" here to match what the background script is saving
+  chrome.storage.local.get(["cognitiveLoad"], (result) => {
+    const score = (result.cognitiveLoad as number) || 0;
+    console.log("Current Load Score:", score); 
 
     // If score is over 85 and the overlay isn't already showing
+    // PRO TIP: Change 85 to 20 when you are testing it so it triggers faster!
     if (score > 85 && !isOverlayActive) {
       isOverlayActive = true;
       overlayElement.style.pointerEvents = "all";

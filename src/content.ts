@@ -1,9 +1,14 @@
 // src/content.ts
 let activityCount = 0;
 
-// 1. TRACKING LOGIC
-window.addEventListener("mousemove", () => { activityCount += 0.5; });
-window.addEventListener("keydown", () => { activityCount += 2; });
+// 1. TRACKING LOGIC (Mouse Movements Only)
+window.addEventListener("mousemove", () => { 
+  // Increased from 0.5 to 1.2 so the meter still moves noticeably 
+  // now that typing isn't helping it.
+  activityCount += 1.2; 
+});
+
+// REMOVED: window.addEventListener("keydown", ...) - Typing no longer tracked.
 
 setInterval(() => {
   if (activityCount > 0) {
@@ -50,7 +55,12 @@ setInterval(() => {
       overlayElement.style.pointerEvents = "all";
       overlayElement.style.opacity = "1";
     }
-    if (score < 50 && isOverlayActive) { isOverlayActive = false; }
+    if (score < 50 && isOverlayActive) { 
+        isOverlayActive = false; 
+        // Auto-hide overlay if score drops naturally
+        overlayElement.style.opacity = "0";
+        overlayElement.style.pointerEvents = "none";
+    }
   });
 }, 2000);
 

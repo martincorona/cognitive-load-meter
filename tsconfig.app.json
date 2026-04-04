@@ -1,27 +1,28 @@
 {
   "compilerOptions": {
     "incremental": true,
-    "target": "ESNext", 
+    "target": "ESNext",
     "useDefineForClassFields": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": ["chrome", "vite/client"],
     "skipLibCheck": true,
-    // ... rest of your file
 
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* ADDED TYPES FOR CHROME */
+    "types": ["chrome", "vite/client"],
+
+    /* Linting - Relaxed for Hackathon speed */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
 }

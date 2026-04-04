@@ -1,13 +1,20 @@
+/* src/App.css */
 :root {
   background-color: #050505;
   color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
 }
 
 .extension-container {
   width: 300px;
   padding: 24px;
   text-align: center;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
 }
 
 header {
@@ -21,13 +28,14 @@ header {
   font-size: 10px;
   letter-spacing: 2px;
   color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
 }
 
 .status-indicator {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  transition: background-color 0.5s ease;
+  transition: background-color 0.5s ease, box-shadow 0.5s ease;
 }
 
 .score-wrapper {
@@ -49,6 +57,7 @@ header {
   font-size: 0.85rem;
   opacity: 0.6;
   height: 40px;
+  margin-top: 10px;
 }
 
 .visualizer-area {
@@ -62,6 +71,7 @@ header {
   width: 50px;
   height: 50px;
   border-radius: 50%;
+  transition: all 0.5s ease;
   animation: pulse 2s infinite ease-in-out;
 }
 
@@ -69,6 +79,10 @@ header {
   0% { transform: scale(0.95); opacity: 0.5; }
   50% { transform: scale(1.05); opacity: 0.8; }
   100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+footer {
+  margin-top: 20px;
 }
 
 .reset-btn {

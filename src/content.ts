@@ -1,21 +1,10 @@
 // src/content.ts
-
-// ==========================================
-// 1. SILENT TRACKER LOGIC (Person 1's Job)
-// ==========================================
 let activityCount = 0;
 
-// Listen for mouse movement
-window.addEventListener("mousemove", () => { 
-  activityCount += 0.5; 
-});
+// 1. TRACKING LOGIC
+window.addEventListener("mousemove", () => { activityCount += 0.5; });
+window.addEventListener("keydown", () => { activityCount += 2; });
 
-// Listen for keystrokes
-window.addEventListener("keydown", () => { 
-  activityCount += 2; 
-});
-
-// Every 2 seconds, send the batch of activity to the background script
 setInterval(() => {
   if (activityCount > 0) {
     chrome.runtime.sendMessage({ type: "ACTIVITY_BATCH", value: activityCount });
@@ -23,110 +12,52 @@ setInterval(() => {
   }
 }, 2000);
 
-
-// ==========================================
-// 2. OVERLAY UI LOGIC (Person 3's Job)
-// ==========================================
+// 2. OVERLAY UI LOGIC
 const createOverlay = () => {
   const overlay = document.createElement("div");
   overlay.id = "cognitive-load-overlay";
-  
-  // Premium styling: Glassmorphism blur effect
   Object.assign(overlay.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    backdropFilter: "blur(8px)", // The magic blur effect
-    zIndex: "999999", // Make sure it's on top of EVERYTHING
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    color: "white",
-    fontFamily: "system-ui, sans-serif",
-    opacity: "0",
-    transition: "opacity 0.5s ease-in-out",
-    pointerEvents: "none" // Start hidden
+    position: "fixed", top: "0", left: "0", width: "100vw", height: "100vh",
+    backgroundColor: "rgba(0, 0, 0, 0.4)", backdropFilter: "blur(10px)",
+    zIndex: "999999", display: "flex", flexDirection: "column",
+    justifyContent: "center", alignItems: "center", color: "white",
+    fontFamily: "system-ui, sans-serif", opacity: "0",
+    transition: "opacity 0.8s ease-in-out", pointerEvents: "none"
   });
 
-  const message = document.createElement("h1");
-  message.innerText = "Cognitive Load High.";
-  message.style.fontSize = "3rem";
-  message.style.marginBottom = "10px";
-
-  const subText = document.createElement("p");
-  subText.innerText = "You've been moving fast. Take a 30-second breath.";
-  subText.style.fontSize = "1.5rem";
-  subText.style.opacity = "0.8";
-
-  const closeButton = document.createElement("button");
-  closeButton.innerText = "I'm focused. Let me work.";
-  Object.assign(closeButton.style, {
-    marginTop: "30px",
-    padding: "12px 24px",
-    fontSize: "1.2rem",
-    border: "none",
-    borderRadius: "8px",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    color: "white",
-    cursor: "pointer",
-    transition: "background 0.2s"
-  });
-
-  // Hover effect for button
-  closeButton.onmouseover = () => closeButton.style.backgroundColor = "rgba(255, 255, 255, 0.4)";
-  closeButton.onmouseout = () => closeButton.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
-
-  // Dismiss logic
-  closeButton.onclick = () => {
-    overlay.style.opacity = "0";
-    setTimeout(() => {
-      overlay.style.pointerEvents = "none";
-      // Tell Chrome we took a break, reset the score so it doesn't immediately pop up again
-      chrome.storage.local.set({ cognitiveLoad: 0 }); 
-      // Tell the background script to reset its internal counter too
-      chrome.runtime.sendMessage({ type: "RESET_LOAD" });
-    }, 500);
-  };
-
-  overlay.appendChild(message);
-  overlay.appendChild(subText);
-  overlay.appendChild(closeButton);
+  overlay.innerHTML = `
+    <div style="text-align: center; max-width: 600px; padding: 40px; border-radius: 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">
+      <h1 style="font-size: 3rem; margin-bottom: 10px;">Deep Breath.</h1>
+      <p style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 30px;">High cognitive load detected. Pause for a moment.</p>
+      <button id="close-load-overlay" style="padding: 12px 24px; font-size: 1.2rem; border: none; border-radius: 8px; background: white; color: black; cursor: pointer; font-weight: bold;">
+        I'm focused. Let me work.
+      </button>
+    </div>
+  `;
   document.body.appendChild(overlay);
-
   return overlay;
 };
 
-// Initialize the overlay on the page
 const overlayElement = createOverlay();
 
-
-// ==========================================
-// 3. THE LISTENER: Watch for the stress score to spike
-// ==========================================
+// 3. THE WATCHER
 let isOverlayActive = false;
-
-// Check the score every 2 seconds
 setInterval(() => {
-  // We use "cognitiveLoad" here to match what the background script is saving
   chrome.storage.local.get(["cognitiveLoad"], (result) => {
     const score = (result.cognitiveLoad as number) || 0;
-    console.log("Current Load Score:", score); 
-
-    // If score is over 85 and the overlay isn't already showing
-    // PRO TIP: Change 85 to 20 when you are testing it so it triggers faster!
     if (score > 85 && !isOverlayActive) {
       isOverlayActive = true;
       overlayElement.style.pointerEvents = "all";
-      overlayElement.style.opacity = "1"; // Fade it in!
-    } 
-    
-    // Reset flag if score drops naturally
-    if (score < 50 && isOverlayActive) {
-        isOverlayActive = false;
+      overlayElement.style.opacity = "1";
     }
+    if (score < 50 && isOverlayActive) { isOverlayActive = false; }
   });
 }, 2000);
+
+document.addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).id === 'close-load-overlay') {
+    overlayElement.style.opacity = "0";
+    overlayElement.style.pointerEvents = "none";
+    chrome.runtime.sendMessage({ type: "RESET_LOAD" });
+  }
+});

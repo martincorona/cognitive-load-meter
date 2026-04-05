@@ -319,8 +319,17 @@ const getDecayedScore = () => {
   return Math.round(clampLoad(value));
 };
 
+const getOverlayScore = () => {
+  if (baseCompositeScore > 0) {
+    return Math.round(clampLoad(baseCompositeScore));
+  }
+
+  return getDecayedScore();
+};
+
 let active = false;
 let baseScore = 0;
+let baseCompositeScore = 0;
 let lastUpdatedAt = Date.now();
 let aiMessage = "";
 let recoveryReportActive = false;
@@ -368,7 +377,7 @@ const runRecoveryReport = () => {
 
   stopAlphaWaveTherapy();
 
-  const latestScore = getDecayedScore();
+  const latestScore = getOverlayScore();
   const fatigueMinutesAvoided = estimateFocusFatigueAvoided(latestScore);
 
   titleElement.textContent = "Post-Session Health Summary";
@@ -387,7 +396,7 @@ const runRecoveryReport = () => {
 closeButtonElement.addEventListener("click", runRecoveryReport);
 
 const renderOverlay = () => {
-  const score = getDecayedScore();
+  const score = getOverlayScore();
 
   if (score >= SHOW_THRESHOLD && !active) {
     subTextElement.textContent = aiMessage.trim() || DEFAULT_MESSAGE;
@@ -407,11 +416,16 @@ const renderOverlay = () => {
 
 const syncFromStorage = (data: {
   currentLoadScore?: number;
+  compositeBurnoutIndex?: number;
   customAiMessage?: string;
   lastUpdatedAt?: number;
 }) => {
   if (typeof data.currentLoadScore === "number") {
     baseScore = clampLoad(data.currentLoadScore);
+  }
+
+  if (typeof data.compositeBurnoutIndex === "number") {
+    baseCompositeScore = clampLoad(data.compositeBurnoutIndex);
   }
 
   if (typeof data.lastUpdatedAt === "number") {
@@ -426,7 +440,12 @@ const syncFromStorage = (data: {
 };
 
 void chrome.storage.local
-  .get([STORAGE_KEYS.score, STORAGE_KEYS.message, STORAGE_KEYS.updatedAt])
+  .get([
+    STORAGE_KEYS.score,
+    STORAGE_KEYS.compositeBurnoutIndex,
+    STORAGE_KEYS.message,
+    STORAGE_KEYS.updatedAt,
+  ])
   .then((result) => {
     syncFromStorage(result);
   });
@@ -436,6 +455,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
   const update: {
     currentLoadScore?: number;
+    compositeBurnoutIndex?: number;
     customAiMessage?: string;
     lastUpdatedAt?: number;
   } = {};
@@ -446,6 +466,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
   if (changes[STORAGE_KEYS.updatedAt]) {
     update.lastUpdatedAt = changes[STORAGE_KEYS.updatedAt].newValue as number;
+  }
+
+  if (changes[STORAGE_KEYS.compositeBurnoutIndex]) {
+    update.compositeBurnoutIndex = changes[STORAGE_KEYS.compositeBurnoutIndex]
+      .newValue as number;
   }
 
   if (changes[STORAGE_KEYS.message]) {

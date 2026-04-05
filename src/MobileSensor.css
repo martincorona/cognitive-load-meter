@@ -1,0 +1,154 @@
+.mobile-bridge {
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(59, 133, 205, 0.22), transparent 42%),
+    radial-gradient(circle at 88% 95%, rgba(55, 180, 142, 0.18), transparent 38%),
+    #050b13;
+  color: #ecf6ff;
+  font-family: "SF Pro Display", "Avenir Next", "Inter", sans-serif;
+}
+
+.mobile-shell {
+  width: min(92vw, 420px);
+  border-radius: 30px;
+  border: 1px solid rgba(169, 206, 244, 0.2);
+  background: rgba(9, 20, 35, 0.78);
+  backdrop-filter: blur(16px);
+  padding: 24px 20px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.mobile-kicker {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgba(194, 217, 243, 0.8);
+}
+
+.mobile-shell h1 {
+  margin: 8px 0 18px;
+  font-size: 28px;
+  font-weight: 620;
+}
+
+.ring-wrap {
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  margin: 0 auto;
+  padding: 12px;
+  box-sizing: border-box;
+  animation: ringFloat 3.2s ease-in-out infinite;
+}
+
+.ring-core {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 20%, #1a3f68, #081223 68%);
+  border: 1px solid rgba(168, 210, 255, 0.3);
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.ring-score {
+  margin: 0;
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 0.95;
+}
+
+.ring-label {
+  margin: 2px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(201, 227, 255, 0.86);
+}
+
+.heart-pulse {
+  margin-top: 6px;
+  color: #ff8d93;
+  font-size: 20px;
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+.band-label {
+  margin: 16px 0 8px;
+  color: rgba(205, 230, 255, 0.95);
+  font-weight: 560;
+}
+
+.mobile-meta {
+  margin: 0 auto;
+  text-align: left;
+  width: min(100%, 320px);
+  border-radius: 14px;
+  border: 1px solid rgba(149, 192, 236, 0.18);
+  background: rgba(6, 14, 24, 0.6);
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.mobile-meta p {
+  margin: 5px 0;
+  font-size: 12px;
+  color: rgba(198, 222, 248, 0.92);
+}
+
+.mobile-button {
+  margin-top: 12px;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(135, 204, 255, 0.5);
+  background: linear-gradient(120deg, #297cc4, #174a7b);
+  color: #eff8ff;
+  font-size: 15px;
+  font-weight: 610;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.mobile-tip {
+  margin: 10px 0 0;
+  color: rgba(181, 210, 241, 0.86);
+  font-size: 12px;
+}
+
+.mobile-tip code {
+  color: #9be5ff;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+}
+
+@keyframes ringFloat {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}

@@ -5,7 +5,9 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -13,7 +15,10 @@ html,
 body,
 #root {
   margin: 0;
-  padding: 0;
-  width: 320px;
-  min-height: 440px;
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  background: #050a12;
 }

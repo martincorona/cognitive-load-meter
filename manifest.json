@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "action": { "default_popup": "index.html" },
   "permissions": ["storage", "tabs", "tabGroups", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://*.firebaseio.com/*",
+    "https://*.firebasedatabase.app/*"
+  ],
   "icons": {
     "128": "icon.png"
   },

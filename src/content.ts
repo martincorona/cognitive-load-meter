@@ -1,6 +1,7 @@
 import {
   DECAY_PER_SECOND,
   HIDE_THRESHOLD,
+  type RecoverySnapshot,
   SHOW_THRESHOLD,
   STORAGE_KEYS,
   clampLoad,
@@ -11,6 +12,9 @@ const ALPHA_LEFT_EAR_HZ = 200;
 const ALPHA_RIGHT_EAR_HZ = 208; // 8Hz binaural differential
 const AUDIO_TARGET_GAIN = 0.3; // 30% max intensity
 const AUDIO_FADE_SECONDS = 1.1;
+const ACTIVITY_FLUSH_MS = 1000;
+const MIN_ACTIVITY_BUMP = 2;
+const MAX_ACTIVITY_BUMP = 18;
 
 type OverlayElements = {
   overlay: HTMLDivElement;
@@ -23,6 +27,59 @@ type OverlayElements = {
 type BinauralEngine = {
   context: AudioContext;
   masterGain: GainNode;
+};
+
+type InterventionMessage = {
+  type: "SHOW_INTERVENTION";
+  value: number;
+  lastUpdatedAt: number;
+  aiMessage?: string;
+  recoverySnapshot: RecoverySnapshot;
+};
+
+const getRecoveryHeadline = (peakScore: number) => {
+  if (peakScore >= 96) {
+    return "You stepped away from a very intense load spike.";
+  }
+
+  if (peakScore >= 90) {
+    return "You caught a high-pressure moment before it dragged on.";
+  }
+
+  return "You interrupted a rising stress pattern at the right time.";
+};
+
+const getRecoveryPatternLine = (snapshot: RecoverySnapshot) => {
+  if (snapshot.pattern === "switching") {
+    const tabLabel = snapshot.tabSwitchCount === 1 ? "tab switch" : "tab switches";
+    return `Frequent context switching stood out most: ${snapshot.tabSwitchCount} recent ${tabLabel}.`;
+  }
+
+  if (snapshot.pattern === "interaction") {
+    return "The pace of typing, clicking, and scrolling stayed intense for a stretch.";
+  }
+
+  if (snapshot.pattern === "mixed") {
+    return "Both rapid interaction and tab switching were stacking up at the same time.";
+  }
+
+  return "Your load built gradually from sustained effort, even without one obvious spike pattern.";
+};
+
+const getRecoveryNextStep = (snapshot: RecoverySnapshot) => {
+  if (snapshot.pattern === "switching") {
+    return "Next step: stay with one tab and one clearly named task for a few minutes.";
+  }
+
+  if (snapshot.pattern === "interaction") {
+    return "Next step: make the next action small so your pace can come back down.";
+  }
+
+  if (snapshot.pattern === "mixed") {
+    return "Next step: pick one tab, one next action, and ignore everything else until it is done.";
+  }
+
+  return "Next step: restart gently with one simple task before taking on anything noisy.";
 };
 
 const injectStyles = () => {
@@ -131,7 +188,7 @@ const createOverlay = (): OverlayElements => {
   });
 
   overlay.append(title, breather, subText, closeButton);
-  document.body.appendChild(overlay);
+  (document.body ?? document.documentElement).appendChild(overlay);
   return { overlay, title, breather, subText, closeButton };
 };
 
@@ -323,6 +380,7 @@ let active = false;
 let baseScore = 0;
 let lastUpdatedAt = Date.now();
 let aiMessage = "";
+let recoverySnapshot: RecoverySnapshot | null = null;
 let recoveryReportActive = false;
 let recoveryReadyToClose = false;
 
@@ -370,13 +428,21 @@ const runRecoveryReport = () => {
 
   const latestScore = getDecayedScore();
   const fatigueMinutesAvoided = estimateFocusFatigueAvoided(latestScore);
+  const summarySnapshot = recoverySnapshot ?? {
+    peakScore: latestScore,
+    tabSwitchCount: 0,
+    activityBumpTotal: 0,
+    pattern: "steady" as const,
+    capturedAt: Date.now(),
+  };
 
   titleElement.textContent = "Post-Session Health Summary";
   breatherElement.style.display = "none";
   subTextElement.innerHTML = [
-    "<strong>Cognitive baseline restored.</strong>",
-    `8Hz alpha-wave therapy complete (200Hz left, 208Hz right).`,
-    `Estimated ${fatigueMinutesAvoided} minutes of focus-fatigue avoided under Yerkes-Dodson arousal modeling.`,
+    `<strong>${getRecoveryHeadline(summarySnapshot.peakScore)}</strong>`,
+    getRecoveryPatternLine(summarySnapshot),
+    `This pause likely saved you about ${fatigueMinutesAvoided} minutes of scattered, low-quality work.`,
+    getRecoveryNextStep(summarySnapshot),
   ].join("<br/>");
 
   closeButtonElement.disabled = false;
@@ -409,6 +475,7 @@ const syncFromStorage = (data: {
   currentLoadScore?: number;
   customAiMessage?: string;
   lastUpdatedAt?: number;
+  latestRecoverySnapshot?: RecoverySnapshot | null;
 }) => {
   if (typeof data.currentLoadScore === "number") {
     baseScore = clampLoad(data.currentLoadScore);
@@ -422,11 +489,20 @@ const syncFromStorage = (data: {
     aiMessage = data.customAiMessage;
   }
 
+  if ("latestRecoverySnapshot" in data) {
+    recoverySnapshot = data.latestRecoverySnapshot ?? null;
+  }
+
   renderOverlay();
 };
 
 void chrome.storage.local
-  .get([STORAGE_KEYS.score, STORAGE_KEYS.message, STORAGE_KEYS.updatedAt])
+  .get([
+    STORAGE_KEYS.score,
+    STORAGE_KEYS.message,
+    STORAGE_KEYS.updatedAt,
+    STORAGE_KEYS.recoverySnapshot,
+  ])
   .then((result) => {
     syncFromStorage(result);
   });
@@ -438,6 +514,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     currentLoadScore?: number;
     customAiMessage?: string;
     lastUpdatedAt?: number;
+    latestRecoverySnapshot?: RecoverySnapshot | null;
   } = {};
 
   if (changes[STORAGE_KEYS.score]) {
@@ -452,7 +529,25 @@ chrome.storage.onChanged.addListener((changes, area) => {
     update.customAiMessage = changes[STORAGE_KEYS.message].newValue as string;
   }
 
+  if (changes[STORAGE_KEYS.recoverySnapshot]) {
+    update.latestRecoverySnapshot = changes[STORAGE_KEYS.recoverySnapshot]
+      .newValue as RecoverySnapshot | null;
+  }
+
   syncFromStorage(update);
+});
+
+chrome.runtime.onMessage.addListener((message: InterventionMessage) => {
+  if (!message || message.type !== "SHOW_INTERVENTION") {
+    return;
+  }
+
+  syncFromStorage({
+    currentLoadScore: message.value,
+    lastUpdatedAt: message.lastUpdatedAt,
+    customAiMessage: message.aiMessage ?? aiMessage,
+    latestRecoverySnapshot: message.recoverySnapshot,
+  });
 });
 
 setInterval(() => {
@@ -462,17 +557,17 @@ setInterval(() => {
 let activityCount = 0;
 
 document.addEventListener("keydown", () => {
-  activityCount += 1;
+  activityCount += 1.5;
 });
 
 document.addEventListener("mousedown", () => {
-  activityCount += 2;
+  activityCount += 3;
 });
 
 document.addEventListener(
   "wheel",
   () => {
-    activityCount += 0.5;
+    activityCount += 1;
   },
   { passive: true },
 );
@@ -480,10 +575,13 @@ document.addEventListener(
 setInterval(() => {
   if (activityCount <= 0) return;
 
-  const stressBump = Math.min(15, Math.ceil(activityCount / 4));
+  const stressBump = Math.min(
+    MAX_ACTIVITY_BUMP,
+    Math.max(MIN_ACTIVITY_BUMP, Math.ceil(activityCount / 3)),
+  );
   chrome.runtime.sendMessage({ type: "ACTIVITY_BATCH", value: stressBump });
   activityCount = 0;
-}, 2000);
+}, ACTIVITY_FLUSH_MS);
 
 // Content scripts can be reinjected. Ensure orphan animation loops are cleaned
 // when the document is unloading.

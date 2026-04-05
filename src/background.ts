@@ -1,12 +1,14 @@
 import {
   DECAY_PER_SECOND,
+  type RecoveryPattern,
+  type RecoverySnapshot,
   SHOW_THRESHOLD,
   STORAGE_KEYS as storageKeys,
   clampLoad,
 } from "./shared";
 
 const TAB_SWITCH_BUMP = 15;
-const INTERVENTION_COOLDOWN_MS = 90_000;
+const INTERVENTION_COOLDOWN_MS = 30_000;
 const CALM_GROUP_TITLE = "🧠 Moment of Calm";
 const CALM_GROUP_COLOR = "blue" as const;
 
@@ -15,12 +17,63 @@ type StorageSnapshot = {
   customAiMessage?: string;
   lastUpdatedAt?: number;
   lastInterventionAt?: number;
+  peakLoadScore?: number;
+  tabSwitchCount?: number;
+  activityBumpTotal?: number;
+  latestRecoverySnapshot?: RecoverySnapshot | null;
+};
+
+type InterventionMessage = {
+  type: "SHOW_INTERVENTION";
+  value: number;
+  lastUpdatedAt: number;
+  aiMessage?: string;
+  recoverySnapshot: RecoverySnapshot;
 };
 
 let currentLoad = 0;
 let lastUpdatedAt = Date.now();
 let lastInterventionAt = 0;
 let isAiGenerating = false;
+let peakLoad = 0;
+let tabSwitchCount = 0;
+let activityBumpTotal = 0;
+
+const getRecoveryPattern = (): RecoveryPattern => {
+  const switchingWeight = tabSwitchCount * TAB_SWITCH_BUMP;
+  const interactionWeight = activityBumpTotal;
+
+  if (switchingWeight >= 30 && interactionWeight >= 12) {
+    return "mixed";
+  }
+
+  if (switchingWeight >= interactionWeight * 1.3 && tabSwitchCount >= 2) {
+    return "switching";
+  }
+
+  if (interactionWeight >= switchingWeight * 1.3 && activityBumpTotal >= 12) {
+    return "interaction";
+  }
+
+  return "steady";
+};
+
+const notifyActiveTab = async (message: InterventionMessage) => {
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    lastFocusedWindow: true,
+  });
+
+  if (!activeTab?.id) return false;
+
+  try {
+    await chrome.tabs.sendMessage(activeTab.id, message);
+    return true;
+  } catch {
+    // Ignore pages where the content script is unavailable.
+    return false;
+  }
+};
 
 const applyDecay = (now = Date.now()) => {
   const elapsedSeconds = (now - lastUpdatedAt) / 1000;
@@ -30,17 +83,28 @@ const applyDecay = (now = Date.now()) => {
   lastUpdatedAt = now;
 };
 
-const persistScore = async () => {
+const persistState = async () => {
   await chrome.storage.local.set({
     [storageKeys.score]: Math.round(currentLoad),
     [storageKeys.updatedAt]: lastUpdatedAt,
+    [storageKeys.peakScore]: Math.round(peakLoad),
+    [storageKeys.tabSwitchCount]: tabSwitchCount,
+    [storageKeys.activityBumpTotal]: Math.round(activityBumpTotal),
   });
 };
 
-const bumpLoad = async (amount: number) => {
+const bumpLoad = async (amount: number, source: "activity" | "tab-switch") => {
   applyDecay();
+
+  if (source === "activity") {
+    activityBumpTotal += amount;
+  } else {
+    tabSwitchCount += 1;
+  }
+
   currentLoad = clampLoad(currentLoad + amount);
-  await persistScore();
+  peakLoad = Math.max(peakLoad, currentLoad);
+  await persistState();
 };
 
 const resetAll = async () => {
@@ -48,12 +112,19 @@ const resetAll = async () => {
   lastUpdatedAt = Date.now();
   lastInterventionAt = 0;
   isAiGenerating = false;
+  peakLoad = 0;
+  tabSwitchCount = 0;
+  activityBumpTotal = 0;
 
   await chrome.storage.local.set({
     [storageKeys.score]: 0,
     [storageKeys.message]: "",
     [storageKeys.updatedAt]: lastUpdatedAt,
     [storageKeys.lastInterventionAt]: 0,
+    [storageKeys.peakScore]: 0,
+    [storageKeys.tabSwitchCount]: 0,
+    [storageKeys.activityBumpTotal]: 0,
+    [storageKeys.recoverySnapshot]: null,
   });
 };
 
@@ -62,6 +133,9 @@ const initializeFromStorage = async () => {
     storageKeys.score,
     storageKeys.updatedAt,
     storageKeys.lastInterventionAt,
+    storageKeys.peakScore,
+    storageKeys.tabSwitchCount,
+    storageKeys.activityBumpTotal,
   ])) as StorageSnapshot;
 
   currentLoad =
@@ -69,9 +143,13 @@ const initializeFromStorage = async () => {
   lastUpdatedAt = typeof data.lastUpdatedAt === "number" ? data.lastUpdatedAt : Date.now();
   lastInterventionAt =
     typeof data.lastInterventionAt === "number" ? data.lastInterventionAt : 0;
+  peakLoad = typeof data.peakLoadScore === "number" ? clampLoad(data.peakLoadScore) : currentLoad;
+  tabSwitchCount = typeof data.tabSwitchCount === "number" ? data.tabSwitchCount : 0;
+  activityBumpTotal = typeof data.activityBumpTotal === "number" ? data.activityBumpTotal : 0;
 
   applyDecay();
-  await persistScore();
+  peakLoad = Math.max(peakLoad, currentLoad);
+  await persistState();
 };
 
 const maybeTriggerIntervention = async (tabTitle: string) => {
@@ -85,8 +163,31 @@ const maybeTriggerIntervention = async (tabTitle: string) => {
   }
 
   isAiGenerating = true;
+  const recoverySnapshot: RecoverySnapshot = {
+    peakScore: Math.round(Math.max(peakLoad, currentLoad)),
+    tabSwitchCount,
+    activityBumpTotal: Math.round(activityBumpTotal),
+    pattern: getRecoveryPattern(),
+    capturedAt: now,
+  };
+
+  const initialShown = await notifyActiveTab({
+    type: "SHOW_INTERVENTION",
+    value: Math.round(currentLoad),
+    lastUpdatedAt,
+    recoverySnapshot,
+  });
+
+  if (!initialShown) {
+    isAiGenerating = false;
+    return;
+  }
+
   lastInterventionAt = now;
-  await chrome.storage.local.set({ [storageKeys.lastInterventionAt]: now });
+  await chrome.storage.local.set({
+    [storageKeys.lastInterventionAt]: now,
+    [storageKeys.recoverySnapshot]: recoverySnapshot,
+  });
 
   try {
     // Health-track upgrade: hide non-active tabs as "sensory deprivation"
@@ -95,9 +196,24 @@ const maybeTriggerIntervention = async (tabTitle: string) => {
 
     const aiText = await generateAIIntervention(tabTitle);
     await chrome.storage.local.set({ [storageKeys.message]: aiText });
+    void notifyActiveTab({
+      type: "SHOW_INTERVENTION",
+      value: Math.round(currentLoad),
+      lastUpdatedAt,
+      aiMessage: aiText,
+      recoverySnapshot,
+    });
   } catch {
+    const fallbackMessage = "You've been moving fast. Take a 30-second breath.";
     await chrome.storage.local.set({
-      [storageKeys.message]: "You've been moving fast. Take a 30-second breath.",
+      [storageKeys.message]: fallbackMessage,
+    });
+    void notifyActiveTab({
+      type: "SHOW_INTERVENTION",
+      value: Math.round(currentLoad),
+      lastUpdatedAt,
+      aiMessage: fallbackMessage,
+      recoverySnapshot,
     });
   } finally {
     isAiGenerating = false;
@@ -120,7 +236,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "ACTIVITY_BATCH" && typeof message.value === "number") {
-    void bumpLoad(message.value).then(async () => {
+    void bumpLoad(message.value, "activity").then(async () => {
       if (currentLoad < SHOW_THRESHOLD) return;
 
       const [activeTab] = await chrome.tabs.query({
@@ -140,7 +256,7 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  await bumpLoad(TAB_SWITCH_BUMP);
+  await bumpLoad(TAB_SWITCH_BUMP, "tab-switch");
 
   const tab = await chrome.tabs.get(activeInfo.tabId);
   const title = tab.title?.trim() || "your task";
@@ -153,6 +269,9 @@ chrome.storage.onChanged.addListener((changes) => {
     currentLoad = 0;
     lastUpdatedAt = Date.now();
     isAiGenerating = false;
+    peakLoad = 0;
+    tabSwitchCount = 0;
+    activityBumpTotal = 0;
   }
 });
 
